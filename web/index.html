@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>stream-web</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<style>
+:root{--bg:#0e0f13;--panel:#12141a;--muted:#8f96a3;--fg:#e9edf3;--primary:#7c5cff;--primary-2:#5fc3ff;--card:#151822;--ring:0 0 0 6px rgba(124,92,255,.1)}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,Cantarell,sans-serif}
+a{color:inherit}
+.container{max-width:1200px;margin:0 auto;padding:24px}
+.hero{min-height:60vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:24px;text-align:center}
+.hero h1{font-size:clamp(28px,6vw,48px);margin:0;background:linear-gradient(90deg,var(--primary),var(--primary-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.searchbar{display:flex;gap:8px;align-items:center;padding:8px;background:#171a23;border:1px solid #232838;border-radius:14px;box-shadow:var(--ring)}
+.searchbar input{width:min(70vw,520px);padding:14px 16px;background:#11141b;border:1px solid #232838;color:var(--fg);border-radius:10px;outline:none}
+.searchbar button{padding:12px 18px;background:var(--primary);color:#fff;font-weight:700;border:none;border-radius:10px;cursor:pointer}
+.section{padding:8px 0 24px}
+.section h2{font-size:18px;color:var(--muted);margin:8px 0 12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px}
+.card{position:relative;background:var(--card);border:1px solid #232838;border-radius:12px;overflow:hidden;cursor:pointer;min-height:220px}
+.card img{width:100%;height:100%;object-fit:cover;display:block;filter:brightness(.95);transition:.25s filter}
+.card .overlay{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:700;padding:8px;text-align:center;opacity:0;transition:.25s opacity}
+.card:hover img{filter:brightness(.4) blur(2px)}
+.card:hover .overlay{opacity:1;text-shadow:0 2px 10px rgba(0,0,0,.6)}
+.player{margin-top:8px;background:var(--panel);border:1px solid #232838;border-radius:14px;padding:12px}
+video{width:100%;max-height:64vh;background:#000;border-radius:10px}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px}
+select,button{padding:8px 10px;background:#161a22;color:#fff;border:1px solid #232838;border-radius:8px}
+button.primary{background:var(--primary);color:#fff;border:none}
+.toggle{padding:8px 10px;border:1px solid #232838;border-radius:8px;background:#161a22;color:#fff;cursor:pointer}
+.hidden{display:none}
+.cover{position:fixed;inset:0;z-index:9999;padding:24px;background:rgba(0,0,0,0.95);}
+.cover .player{height:100%;display:flex;flex-direction:column}
+.cover video{width:100%;height:100%;max-height:none;border-radius:6px}
+.player{position:relative}
+.player video{display:block}
+.player .controls{position:absolute;left:12px;right:12px;bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;background:linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.55) 60%);padding:12px;border-radius:10px}
+.player .controls select, .player .controls button{background:rgba(20,20,24,0.6);border:1px solid rgba(255,255,255,0.06);color:#fff}
+.theater{position:fixed;inset:0;z-index:9998;padding:0;background:#000;display:flex;align-items:center;justify-content:center}
+.theater .player{width:100%;height:100%;max-width:none;max-height:none;border-radius:0;padding:0;border:0;background:#000}
+.theater video{width:100%;height:100%;max-height:none;border-radius:0}
+.side-panel{position:absolute;top:0;right:0;width:360px;max-width:48%;height:100%;background:rgba(18,20,24,0.98);border-left:1px solid rgba(255,255,255,0.06);border-radius:0;padding:12px;overflow:auto;transform:translateX(110%);opacity:0;transition:transform .25s ease, opacity .25s ease}
+.side-panel.open{transform:translateX(0%)}
+.side-panel.open{opacity:1}
+.side-panel .epgrid{display:block}
+.side-panel .epcard{display:flex;gap:8px;padding:8px;border-radius:8px;margin-bottom:8px}
+.side-panel .epcard img{width:96px;height:54px;object-fit:cover;border-radius:6px}
+.side-panel .epcard .label{position:static;background:transparent;padding:0;margin:0;color:#fff}
+.side-panel .filler{display:none}
+.epgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-top:12px}
+.epcard{position:relative;border:1px solid #232838;background:#12141a;border-radius:10px;overflow:hidden;cursor:pointer}
+.epcard img{width:100%;height:100px;object-fit:cover;display:block}
+.epcard .label{position:absolute;bottom:6px;left:6px;right:6px;font-size:12px;background:rgba(0,0,0,.55);color:#fff;padding:3px 6px;border-radius:6px}
+.epcard .filler{position:absolute;top:6px;right:6px;font-size:11px;background:#b91c1c;color:#fff;padding:2px 6px;border-radius:6px}
+.recent-row{display:grid;grid-auto-flow:column;grid-auto-columns:150px;gap:12px;Overflow-x:auto;padding-bottom:6px}
+.recent-row::-webkit-scrollbar{height:8px}
+.recent-row::-webkit-scrollbar-thumb{background:#232838;border-radius:8px}
+.recentcard{position:relative;border:1px solid #232838;background:#12141a;border-radius:10px;overflow:hidden;cursor:pointer;height:120px}
+.recentcard img{width:100%;height:100px;object-fit:cover;display:block}
+.recentcard .label{position:absolute;bottom:6px;left:6px;right:6px;font-size:12px;background:rgba(0,0,0,.55);color:#fff;padding:3px 6px;border-radius:6px}
+.muted{color:var(--muted);font-size:14px}
+footer{margin-top:36px;color:var(--muted);text-align:center}
+</style>
+</head>
+<body>
+<div class="container">
+  <section class="hero" id="hero">
+    <h1>welcome to stream-web</h1>
+    <div class="searchbar">
+      <input id="q" placeholder="Search for anime or TV/movies" />
+      <button id="search">Go</button>
+    </div>
+    <div style="margin-top:8px;display:flex;gap:8px;justify-content:center">
+      <button id="btnAnime" class="primary">Anime</button>
+      <button id="btnTV" class="toggle">TV / movies</button>
+    </div>
+  </section>
+  <section class="section" id="recentWrap">
+    <h2>Continue watching</h2>
+    <div id="recent" class="recent-row"></div>
+    <div id="recentEmpty" class="muted">No history yet.</div>
+  </section>
+  <section class="section">
+    <div id="results" class="grid"></div>
+  </section>
+  <section id="watch" class="section hidden">
+    <div class="player">
+      <video id="video" controls playsinline></video>
+      <div class="controls" role="toolbar">
+        <div style="flex:1;display:flex;gap:8px;align-items:center">
+          <select id="audio"></select>
+          <select id="res"></select>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button id="resume" class="primary hidden">Resume</button>
+          <button id="skipFillers" class="toggle">Skip fillers: Off</button>
+          <button id="browseBtn" class="toggle">Browse</button>
+          <button id="theaterBtn" class="toggle">Theater</button>
+        </div>
+      </div>
+      <div id="sidePanel" class="side-panel hidden">
+        <div class="side-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <strong>Browse</strong>
+          <button id="sideClose" class="toggle">Close</button>
+        </div>
+        <div id="sideEpisodes" class="epgrid"></div>
+      </div>
+    </div>
+    <div style="margin-top:12px" class="muted" id="title"></div>
+    <div id="episodes" class="epgrid"></div>
+  </section>
+</div>
+<footer>Built with streamweb-cli • anime-web</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+<script src="app.js"></script>
+  </body>
+</html>
+
