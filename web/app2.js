@@ -66,6 +66,7 @@ async function proxyFetch(url) {
 }
 
 async function search(query) {
+  console.log('[search] query=', query, 'source=', sourceSelect.value)
   if (sourceSelect.value === 'anime') return await animeSearch(query)
   const q = query.replace(/\s+/g,'-')
   const url = `${FLIXHQ_BASE}/search/${q}`
@@ -152,7 +153,7 @@ searchBtn.addEventListener('click', async ()=>{
           const slug = r.slug || r.url || r.session || r.id || ''
           const title = r.title || ''
           if (!slug) return alert('Invalid anime selection')
-          window.location.href = `/player.html?source=anime&slug=${encodeURIComponent(slug)}&title=${encodeURIComponent(title)}&poster=${encodeURIComponent(r.poster||'')}`
+          window.location.href = `/player.html?source=anime&slug=${encodeURIComponent(slug)}&title=${encodeURIComponent(title)}`
           return
         }
 
@@ -160,11 +161,11 @@ searchBtn.addEventListener('click', async ()=>{
           const url = r.url || ''
           const title = r.title || ''
           if (!url) return alert('Invalid selection')
-          window.location.href = `/player.html?source=flixhq&slug=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}&poster=${encodeURIComponent(r.poster||'')}`
+          window.location.href = `/player.html?source=flixhq&slug=${encodeURIComponent(url)}&title=${encodeURIComponent(title)}`
           return
         }
 
-        window.location.href = `/player.html?slug=${encodeURIComponent(r.url||r.slug||r.id)}&title=${encodeURIComponent(r.title||'')}&poster=${encodeURIComponent(r.poster||'')}`
+        window.location.href = `/player.html?slug=${encodeURIComponent(r.url||r.slug||r.id)}&title=${encodeURIComponent(r.title||'')}`
       })
 
       resultsGrid.appendChild(card)
@@ -181,13 +182,13 @@ async function onSelectResult(item){
   if (sourceSelect.value === 'anime' && !/^https?:\/\//.test(u)) {
     const slug = u
     const title = item.title || ''
-    window.location.href = `/player.html?source=anime&slug=${encodeURIComponent(slug)}&title=${encodeURIComponent(title)}&poster=${encodeURIComponent(item.poster||'')}`
+    window.location.href = `/player.html?source=anime&slug=${encodeURIComponent(slug)}&title=${encodeURIComponent(title)}`
     return
   }
 
   const isFlix = u.includes('flixhq.to') || u.includes('/tv/') || u.includes('/movie/')
   if (isFlix) {
-    window.location.href = `/player.html?source=flixhq&slug=${encodeURIComponent(u)}&title=${encodeURIComponent(item.title||'')}&poster=${encodeURIComponent(item.poster||'')}`
+    window.location.href = `/player.html?source=flixhq&slug=${encodeURIComponent(u)}&title=${encodeURIComponent(item.title||'')}`
     return
   }
 
@@ -214,7 +215,7 @@ async function onSelectResult(item){
 
       c.addEventListener('click', () => {
         const title = displayTitle || item.title || ''
-        window.location.href = `/player.html?source=anime&slug=${encodeURIComponent(slug)}&episode=${encodeURIComponent(ep.episode)}&title=${encodeURIComponent(title)}&poster=${encodeURIComponent(item.poster||'')}`
+        window.location.href = `/player.html?source=anime&slug=${encodeURIComponent(slug)}&episode=${encodeURIComponent(ep.episode)}&title=${encodeURIComponent(title)}`
       })
 
       grid.appendChild(c)
@@ -263,6 +264,7 @@ async function decodeUrl(url) {
       return [url, []]
     }
     const data = await resp.json()
+    console.log('[decodeUrl] decoder response:', data)
     if (data && data.sources && data.sources.length) {
       const file = data.sources[0].file
       const subs = (data.tracks||[]).filter(t=>t.kind==='captions'&&t.file).map(t=>t.file)
@@ -272,18 +274,29 @@ async function decodeUrl(url) {
     const txt = typeof data === 'string' ? data : JSON.stringify(data)
     const m = txt.match(/"file":"([^"]*\.m3u8[^"]*)"/)
     if (m) return [m[1], []]
+
     try {
       const extracted = await extractM3U8FromEmbed(url)
-      if (extracted) return [extracted, []]
-    } catch (e) {}
+      if (extracted) {
+        console.log('[decodeUrl] fallback extracted m3u8:', extracted)
+        return [extracted, []]
+      }
+    } catch (e) { console.warn('[decodeUrl] fallback extractor failed', e && e.message) }
+
     try {
       const serverResp = await fetch(`/proxy/extract?url=${encodeURIComponent(url)}`)
       if (serverResp.ok) {
         const jd = await serverResp.json()
-        if (jd && jd.file) return [jd.file, []]
+        if (jd && jd.file) {
+          console.log('[decodeUrl] server extractor found m3u8:', jd.file)
+          return [jd.file, []]
+        }
+      } else {
+        console.warn('[decodeUrl] server extractor returned', serverResp.status)
       }
-    } catch (e) {}
-  } catch (e) {}
+    } catch (e) { console.warn('[decodeUrl] server extractor error', e && e.message) }
+
+  } catch (e) { console.warn('[decodeUrl] error', e && e.message) }
   return [url, []]
 }
 
@@ -292,17 +305,17 @@ async function handleMedia(mediaList, title){
   if (action === 'play') {
     const m = Array.isArray(mediaList) ? mediaList[0] : mediaList;
     if (m.type === 'anime' && m.slug) {
-      const url = `/player.html?source=anime&slug=${encodeURIComponent(m.slug)}${m.episode?`&episode=${encodeURIComponent(m.episode)}`:''}&title=${encodeURIComponent(title||m.label||'')}&poster=${encodeURIComponent(m.thumb||m.poster||'')}`
+      const url = `/player.html?source=anime&slug=${encodeURIComponent(m.slug)}${m.episode?`&episode=${encodeURIComponent(m.episode)}`:''}&title=${encodeURIComponent(title||m.label||'')}`
       window.location.href = url
       return
     }
     if (m.file) {
-      const url = `/player.html?file=${encodeURIComponent(m.file)}&title=${encodeURIComponent(title||m.label||'')}&type=${encodeURIComponent(m.type||'embed')}&poster=${encodeURIComponent(m.thumb||m.poster||'')}`
+      const url = `/player.html?file=${encodeURIComponent(m.file)}&title=${encodeURIComponent(title||m.label||'')}&type=${encodeURIComponent(m.type||'embed')}`
       window.location.href = url
       return
     }
     if (m.slug || m.url) {
-      const url = `/player.html?source=${encodeURIComponent(m.type||'embed')}&slug=${encodeURIComponent(m.slug||m.url)}&title=${encodeURIComponent(title||m.label||'')}&poster=${encodeURIComponent(m.thumb||m.poster||'')}`
+      const url = `/player.html?source=${encodeURIComponent(m.type||'embed')}&slug=${encodeURIComponent(m.slug||m.url)}&title=${encodeURIComponent(title||m.label||'')}`
       window.location.href = url
       return
     }
@@ -323,9 +336,11 @@ async function handleMedia(mediaList, title){
 
 async function provideData(mediaList, parentTitle) {
   if (!mediaList) {
+    console.log('No media selected for playback');
     return;
   }
   const episodes = Array.isArray(mediaList) ? mediaList : [mediaList];
+  const autoplay = autoplayNext.checked;
   for (let i = 0; i < episodes.length; i++) {
     const ep = episodes[i];
     let decoded, subs
@@ -337,11 +352,11 @@ async function provideData(mediaList, parentTitle) {
     }
     const dispTitle = parentTitle || ep.showTitle || ep.movie_title || ep.episode_title || ep.label;
     if (decoded) {
-      const playerUrl = `/player.html?file=${encodeURIComponent(decoded)}&title=${encodeURIComponent(dispTitle)}&poster=${encodeURIComponent(ep.thumb||'')}`
+      const playerUrl = `/player.html?file=${encodeURIComponent(decoded)}&title=${encodeURIComponent(dispTitle)}`
       window.location.href = playerUrl
       return
     } else {
-      const playerUrl = `/player.html?file=${encodeURIComponent(ep.file)}&title=${encodeURIComponent(dispTitle)}&poster=${encodeURIComponent(ep.thumb||'')}`
+      const playerUrl = `/player.html?file=${encodeURIComponent(ep.file)}&title=${encodeURIComponent(dispTitle)}`
       window.location.href = playerUrl
       return
     }
@@ -356,6 +371,7 @@ async function playUrl(url, title, opts){
     if (extracted) finalUrl = extracted
   }
   if (/\.m3u8/i.test(finalUrl) && !/\/proxy\/manifest\?/.test(finalUrl)) finalUrl = `/proxy/manifest?url=${encodeURIComponent(finalUrl)}`
+  console.log('[playUrl] finalUrl=', finalUrl)
   if (Hls.isSupported()) {
     if (window.hls) { window.hls.destroy(); window.hls = null }
     const hls = new Hls()
@@ -363,17 +379,27 @@ async function playUrl(url, title, opts){
     hls.loadSource(finalUrl)
     hls.attachMedia(videoEl)
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
-      try { setupHlsSelectors(hls) } catch(e) {}
+      try { setupHlsSelectors(hls) } catch(e) { console.warn('setupHlsSelectors failed', e && e.message) }
       videoEl.play().catch(()=>{})
     })
     hls.on(Hls.Events.ERROR, (e, d) => {
+      console.error('hls error', e, d)
       try {
         const details = d && d.details ? d.details : ''
         const fatal = d && d.fatal
+        if (details && (details === 'bufferAddCodecError' || details === 'bufferAppendError')) {
+          downloadLink.style.display = 'inline-block'
+          downloadLink.href = finalUrl
+          downloadLink.textContent = 'Open stream / download manifest'
+          try { hls.destroy(); window.hls = null } catch (e) {}
+          try { videoEl.src = finalUrl; videoEl.play().catch(()=>{}) } catch (e) {}
+          return
+        }
         if (fatal) {
+          console.warn('hls fatal error, destroying hls')
           try { hls.destroy(); window.hls = null } catch (e) {}
         }
-      } catch (err) {}
+      } catch (err) { console.error('error handling hls error', err) }
     })
   } else if (videoEl.canPlayType('application/vnd.apple.mpegurl')) {
     videoEl.src = finalUrl
@@ -384,6 +410,7 @@ async function playUrl(url, title, opts){
 }
 
 function setupHlsSelectors(hls){
+  if (currentContext && currentContext.type === 'anime') return
   if (!hls) return
   if (resSelect) {
     resSelect.innerHTML = ''
@@ -447,8 +474,6 @@ async function resumeEntry(entry){
   const item = { title: entry.title || 'Resume', url: u }
   return onSelectResult(item)
 }
-
-renderHistory()
 
 renderHistory()
 

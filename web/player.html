@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Player</title>
+  <link rel="stylesheet" href="/player.css" />
+</head>
+<body>
+  <div id="player-root" class="player-root" tabindex="-1">
+    <header class="topbar">
+      <a href="/" class="back">← Back</a>
+      <div class="title">
+        <div id="crumb" class="series-title">Series</div>
+        <div id="episode-title" class="episode-subtitle"></div>
+      </div>
+      <div class="right-top">
+        <div id="logo" class="logo">stream-web</div>
+      </div>
+    </header>
+
+    <!-- video container -->
+    <div class="video-wrap" id="video-wrap">
+      <video id="video" class="video" playsinline webkit-playsinline preload="metadata"></video>
+
+      <!-- bottom controls -->
+      <div class="controls" id="controls">
+        <div class="controls-left">
+          <button id="playpause" class="icon-btn" aria-label="Play/Pause">
+            <svg viewBox="0 0 24 24" class="icon play"><path d="M6 4v16l12-8z"/></svg>
+            <svg viewBox="0 0 24 24" class="icon pause hidden"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+          </button>
+          <button id="rew10" class="icon-btn" title="-10s">«10</button>
+          <button id="fwd10" class="icon-btn" title="+10s">10»</button>
+          <button id="episodes-toggle" class="icon-btn" title="Episodes">Episodes</button>
+        </div>
+
+        <div class="controls-center">
+          <div class="progress-wrap" id="progress-wrap">
+            <div class="progress-rail">
+              <div class="progress-buffer" id="progress-buffer" style="width:0%"></div>
+              <div class="progress-play" id="progress-play" style="width:0%"></div>
+            </div>
+            <input id="seek" class="seek" type="range" min="0" max="100" step="0.01" value="0" aria-label="Seek">
+          </div>
+        </div>
+
+        <div class="controls-right">
+          <div class="time" id="time">00:00 / 00:00</div>
+
+          <select id="audio-select" class="select" title="Audio" aria-label="Audio track">
+            <option value="">Audio</option>
+          </select>
+
+          <select id="quality-select" class="select" title="Quality" aria-label="Quality">
+            <option value="-1">Auto</option>
+          </select>
+
+          <button id="settings" class="icon-btn" title="Settings">⚙</button>
+          <button id="fullscreen" class="icon-btn" title="Fullscreen" aria-label="Fullscreen">⤢</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Episode selector modal -->
+  <div id="selector-modal" class="selector-modal hidden" role="dialog" aria-hidden="true">
+    <div class="selector-card" role="document">
+      <header class="selector-header">
+        <h3 id="selector-series-title">Series</h3>
+        <button id="close-selector" aria-label="Close">✕</button>
+      </header>
+      <div id="seasons-list" class="seasons-list"></div>
+    </div>
+  </div>
+
+  <!-- hls.js CDN, fallback to native HLS on Safari -->
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0/dist/hls.min.js"></script>
+  <script src="/player.js"></script>
+</body>
+</html>
