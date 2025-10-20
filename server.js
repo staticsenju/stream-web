@@ -9,6 +9,11 @@ const DECODER = 'https://dec.eatmynerds.live'
 
 const app = express()
 const PORT = process.env.PORT || 3000
+const http = require('http')
+const server = http.createServer(app)
+const { Server } = require('socket.io')
+
+const rooms = {}
 
 app.use(express.static(path.join(__dirname, 'web')))
 
@@ -179,4 +184,82 @@ async function axiosGetWithInsecureFallback(url, opts) {
   }
 }
 
-app.listen(PORT, () => console.log(`[stream-web] listening at http://localhost:${PORT}`))
+function makeCode() {
+  const letters = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+  let s = '';
+  for (let i = 0; i < 6; i++) s += letters[Math.floor(Math.random() * letters.length)];
+  return s;
+}
+
+app.post('/watch/create', express.json(), (req, res) => {
+  let code = makeCode();
+  let attempts = 0;
+  while (rooms[code] && attempts++ < 5) code = makeCode();
+  rooms[code] = { hostId: null, state: null }
+  console.log('[watch] created party', code)
+  return res.json({ code })
+})
+
+app.get('/watch/exists/:code', (req, res) => {
+  const code = String(req.params.code || '').toUpperCase()
+  if (!code) return res.status(400).json({ error: 'code required' })
+  console.log('[watch] exists check', code, !!rooms[code])
+  return res.json({ exists: !!rooms[code] })
+})
+
+server.listen(PORT, () => console.log(`[stream-web] listening at http://localhost:${PORT}`))
+
+const io = new Server(server, { cors: { origin: '*', methods: ['GET','POST'] } })
+
+io.on('connection', (socket) => {
+  console.log('[socket] connected', socket.id)
+
+  socket.on('disconnecting', (reason) => {
+    console.log('[socket] disconnecting', socket.id, 'reason', reason)
+  })
+
+  socket.on('watch:join', (code, cb) => {
+    try {
+      code = String(code||'').toUpperCase()
+      console.log('[watch] join request', { socket: socket.id, code })
+      if (!code || !rooms[code]) return cb && cb({ error: 'not_found' })
+      socket.join(code)
+      const room = rooms[code]
+      const payload = { state: room.state || null }
+      socket.emit('watch:joined', payload)
+      cb && cb({ ok: true })
+      console.log('[watch] joined', { socket: socket.id, code, payload })
+    } catch (e) { cb && cb({ error: 'exception' }) }
+  })
+
+  socket.on('watch:host', (code, isHost, cb) => {
+    try {
+      code = String(code||'').toUpperCase()
+      if (!code) return cb && cb({ error: 'code required' })
+      if (!rooms[code]) rooms[code] = { hostId: null, state: null }
+      if (isHost) rooms[code].hostId = socket.id
+      else if (rooms[code].hostId === socket.id) rooms[code].hostId = null
+      cb && cb({ ok: true })
+      console.log('[watch] host toggle', { socket: socket.id, code, isHost })
+    } catch (e) { cb && cb({ error: 'exception' }) }
+  })
+
+  socket.on('watch:state', (code, state) => {
+    try {
+      code = String(code||'').toUpperCase()
+      if (!code || !rooms[code]) return
+      rooms[code].state = state
+      socket.to(code).emit('watch:state', state)
+      console.log('[watch] state from', socket.id, '->', code, state)
+    } catch (e) {}
+  })
+
+  socket.on('disconnect', () => {
+    try {
+      for (const code of Object.keys(rooms)) {
+        if (rooms[code].hostId === socket.id) rooms[code].hostId = null
+      }
+    } catch (e) {}
+    console.log('[socket] disconnected', socket.id)
+  })
+})

@@ -42,6 +42,53 @@
 		const HIDE_DELAY = 3000
 		let generatedObjectUrls = []
 
+		let watchSocket = null
+		let watchPartyCode = null
+		let watchAmHost = false
+		let watchApplyingRemote = false
+
+		function watchLog(...args) { try { console.log('[watch]', ...args) } catch (e) {} }
+
+		function watchEmitState(state) {
+			if (!watchSocket || !watchPartyCode) return
+			watchLog('emit state', watchPartyCode, state)
+			try { watchSocket.emit('watch:state', watchPartyCode, state) } catch (e) { watchLog('emit error', e) }
+		}
+
+		function watchApplyRemoteState(state, forceSeek=false) {
+			if (!state) return
+			try {
+				watchApplyingRemote = true
+				watchLog('apply remote state', state)
+				if (state.url && state.url !== (window.location.search.includes('file=') ? decodeURIComponent(new URLSearchParams(window.location.search).get('file')) : null)) {
+					watchLog('remote requested media load', state.url)
+					const params = new URLSearchParams(window.location.search)
+					params.set('file', state.url)
+					window.location.search = params.toString()
+					return
+				}
+				if (state.action === 'play') {
+					if (video) {
+						if (typeof state.time === 'number') video.currentTime = state.time || 0
+						video.play().then(()=>watchLog('remote play ok')).catch(err=>watchLog('remote play failed', err))
+					}
+				} else if (state.action === 'pause') {
+					if (video) {
+						if (typeof state.time === 'number') video.currentTime = state.time || 0
+						video.pause()
+					}
+				} else if (state.action === 'seek') {
+					if (video && typeof state.time === 'number') {
+						const diff = Math.abs((video.currentTime||0) - state.time)
+						if (forceSeek || diff > 0.5) video.currentTime = state.time
+					}
+				} else if (state.action === 'load') {
+					if (state.url) publicPlay(state.url, state.title||'')
+				}
+			} catch (e) { watchLog('apply remote exception', e) }
+			setTimeout(()=>watchApplyingRemote = false, 250)
+		}
+
 		function resetHideTimer() {
 			showControls();
 			if (hideTimer) clearTimeout(hideTimer);
@@ -723,6 +770,16 @@
 				let attachSrc = proxied;
 				if (String(finalSrc).startsWith('blob:') || String(finalSrc).startsWith('data:')) attachSrc = finalSrc;
 				attachHls(attachSrc, finalSrc);
+				try {
+					localStorage.setItem('watch_last', JSON.stringify({ slug: SLUG || '', seasonId, episodeId, file: finalSrc }))
+				} catch (e) {}
+
+				try {
+					if (watchAmHost && watchPartyCode) {
+						watchEmitState({ action: 'load', url: finalSrc, title: seriesData?.title || URL_TITLE || '' })
+						watchLog('host emitted load for', finalSrc)
+					}
+				} catch (e) { watchLog('loadEpisode emit error', e) }
 				if (resumeAt && video) {
 					const trySeek = () => {
 						try {
@@ -946,4 +1003,159 @@
 			window.player.playFlixEpisode = playFlixEpisodeByDataId;
 			window.player.loadSeries = loadSeries
 			loadSeries()
+			try {
+				watchSocket = (typeof io === 'function') ? io() : null;
+				if (watchSocket) watchLog('socket initialized', watchSocket.id || '(no id yet)')
+				try {
+					const saved = JSON.parse(localStorage.getItem('watch_party') || 'null')
+					if (saved && saved.code) {
+						watchPartyCode = saved.code
+						watchAmHost = !!saved.host
+						watchLog('restored saved party', watchPartyCode, 'host=', watchAmHost)
+					}
+				} catch (e) { }
+
+				const rightTop = document.querySelector('.right-top') || document.querySelector('.topbar');
+				if (rightTop && watchSocket) {
+					const dropdown = document.createElement('div');
+					dropdown.className = 'watch-dropdown';
+					rightTop.appendChild(dropdown);
+
+					const toggle = document.createElement('button');
+					toggle.className = 'watch-toggle';
+					toggle.type = 'button';
+					toggle.textContent = 'Party';
+					dropdown.appendChild(toggle);
+
+					const panel = document.createElement('div');
+					panel.className = 'watch-panel';
+					panel.innerHTML = `
+						<div style="display:flex;align-items:center;gap:6px">
+							<input id="watch-code" placeholder="CODE" maxlength="6" />
+							<button id="create-party">Create</button>
+							<button id="join-party">Join</button>
+							<button id="host-toggle">Host</button>
+						</div>
+						<div class="status" id="watch-status">Not in party</div>
+					`;
+					dropdown.appendChild(panel);
+
+					toggle.addEventListener('click', () => panel.classList.toggle('open'))
+
+					const codeInput = panel.querySelector('#watch-code');
+					const createBtn = panel.querySelector('#create-party');
+					const joinBtn = panel.querySelector('#join-party');
+					const hostBtn = panel.querySelector('#host-toggle');
+					const statusEl = panel.querySelector('#watch-status');
+
+					function setStatus(txt) { statusEl.textContent = txt; console.log('[watch][status]', txt) }
+
+					createBtn.addEventListener('click', async () => {
+						try {
+							console.log('[watch][client] creating party...')
+							const resp = await fetch('/watch/create', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+							if (!resp.ok) { setStatus('create failed'); console.warn('[watch][client] create failed', resp.status); return }
+							const jd = await resp.json();
+							partyCode = jd.code;
+							watchPartyCode = partyCode;
+							codeInput.value = partyCode;
+							localStorage.setItem('watch_party', JSON.stringify({ code: watchPartyCode, host: watchAmHost }))
+							setStatus('Created '+partyCode)
+							console.log('[watch][client] created', partyCode)
+						} catch (e) { setStatus('create err'); console.error('[watch][client] create error', e) }
+					})
+
+					joinBtn.addEventListener('click', () => {
+						const code = (codeInput.value||'').trim().toUpperCase();
+						if (!code) return setStatus('enter code')
+						watchPartyCode = code;
+						localStorage.setItem('watch_party', JSON.stringify({ code: watchPartyCode, host: watchAmHost }))
+						watchLog('joining', watchPartyCode)
+						watchSocket.emit('watch:join', watchPartyCode, (res) => {
+							watchLog('join cb', res)
+							if (res && res.error) { setStatus('not found'); console.warn('[watch][client] join not found', watchPartyCode); return }
+							setStatus('Joined '+watchPartyCode)
+						})
+					})
+
+					hostBtn.addEventListener('click', () => {
+						if (!watchPartyCode) return setStatus('no code')
+						watchAmHost = !watchAmHost;
+						hostBtn.textContent = watchAmHost ? 'Hosting' : 'Host';
+						watchLog('host toggle', { code: watchPartyCode, host: watchAmHost })
+						watchSocket.emit('watch:host', watchPartyCode, watchAmHost, (res) => {
+							watchLog('host cb', res)
+						})
+						localStorage.setItem('watch_party', JSON.stringify({ code: watchPartyCode, host: watchAmHost }))
+						setStatus(watchAmHost ? 'Hosting' : 'Joined '+watchPartyCode)
+					})
+
+					watchSocket.on('connect', () => watchLog('socket connect', watchSocket.id))
+					watchSocket.on('disconnect', (reason) => watchLog('socket disconnect', reason))
+					watchSocket.on('connect_error', (err) => watchLog('connect_error', err))
+
+					watchSocket.on('watch:joined', (payload) => {
+						watchLog('received watch:joined', payload)
+						if (payload && payload.state) watchApplyRemoteState(payload.state, true)
+					})
+
+					watchSocket.on('watch:state', (state) => {
+						watchLog('received watch:state', state)
+						watchApplyRemoteState(state)
+					})
+
+					function emitState(state) {
+						if (!watchSocket || !watchPartyCode) return
+						watchLog('emitState', state)
+						watchSocket.emit('watch:state', watchPartyCode, state)
+					}
+
+
+					video?.addEventListener('play', () => {
+						watchLog('local play', { host: watchAmHost, code: watchPartyCode, applyingRemote: watchApplyingRemote, time: video?.currentTime })
+						if (!watchAmHost || !watchPartyCode || watchApplyingRemote) return;
+						emitState({ action: 'play', time: video.currentTime })
+					})
+					video?.addEventListener('pause', () => {
+						watchLog('local pause', { host: watchAmHost, code: watchPartyCode, applyingRemote: watchApplyingRemote, time: video?.currentTime })
+						if (!watchAmHost || !watchPartyCode || watchApplyingRemote) return;
+						emitState({ action: 'pause', time: video.currentTime })
+					})
+					let seekTimeout = null;
+					video?.addEventListener('seeking', () => {
+						if (!watchAmHost || !watchPartyCode || watchApplyingRemote) return;
+						if (seekTimeout) clearTimeout(seekTimeout);
+						seekTimeout = setTimeout(()=>{
+							emitState({ action: 'seek', time: video.currentTime })
+						}, 150)
+					})
+
+					const origPublicPlay = publicPlay;
+					publicPlay = async function(url, displayTitle, opts = {}) {
+						await origPublicPlay(url, displayTitle, opts)
+						if (watchAmHost && watchPartyCode) {
+							watchEmitState({ action: 'load', url, title: displayTitle || '' })
+							watchLog('publicPlay emitted load', url)
+						}
+					}
+
+					try {
+						const saved = JSON.parse(localStorage.getItem('watch_party') || 'null')
+						if (saved && saved.code) {
+							codeInput.value = saved.code
+							watchPartyCode = saved.code
+							watchAmHost = !!saved.host
+							watchLog('auto-rejoin', watchPartyCode, 'host=', watchAmHost)
+							watchSocket.emit('watch:join', watchPartyCode, (res) => {
+								watchLog('auto join cb', res)
+								if (res && res.error) return setStatus('join failed')
+								setStatus('Joined '+watchPartyCode)
+								if (watchAmHost) watchSocket.emit('watch:host', watchPartyCode, true, ()=>{})
+							})
+						}
+					} catch (e) { watchLog('auto rejoin error', e) }
+				}
+			} catch (e) {
+				console.error('[watch][client] initialization error', e)
+			}
 		})();
