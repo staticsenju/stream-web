@@ -239,8 +239,12 @@ io.on('connection', (socket) => {
       if (!rooms[code]) rooms[code] = { hostId: null, state: null }
       if (isHost) rooms[code].hostId = socket.id
       else if (rooms[code].hostId === socket.id) rooms[code].hostId = null
-      cb && cb({ ok: true })
-      console.log('[watch] host toggle', { socket: socket.id, code, isHost })
+      const hostIs = rooms[code].hostId === socket.id
+      cb && cb({ ok: true, host: hostIs })
+      console.log('[watch] host toggle', { socket: socket.id, code, isHost, hostIs })
+      try {
+        io.to(code).emit('watch:host', { hostId: rooms[code].hostId })
+      } catch (e) { console.warn('[watch] host broadcast failed', e) }
     } catch (e) { cb && cb({ error: 'exception' }) }
   })
 
@@ -248,10 +252,21 @@ io.on('connection', (socket) => {
     try {
       code = String(code||'').toUpperCase()
       if (!code || !rooms[code]) return
-      rooms[code].state = state
-      socket.to(code).emit('watch:state', state)
-      console.log('[watch] state from', socket.id, '->', code, state)
-    } catch (e) {}
+      const enriched = Object.assign({}, state, { _ts: Date.now(), _from: socket.id })
+      rooms[code].state = enriched
+      socket.to(code).emit('watch:state', enriched)
+      if (state && state.action === 'load') {
+        const url = state.url || state.file || (state.last && state.last.file) || null
+        const seasonId = state.seasonId || (state.meta && state.meta.seasonId) || null
+        const episodeId = state.episodeId || (state.meta && state.meta.episodeId) || null
+        const slug = state.slug || (state.meta && state.meta.slug) || null
+        console.log('[watch] load', { from: socket.id, code, url, slug, seasonId, episodeId })
+      } else {
+        console.log('[watch] state from', socket.id, '->', code, state && state.action ? state.action : state)
+      }
+    } catch (e) {
+      console.warn('[watch] state handler error', e && e.message)
+    }
   })
 
   socket.on('disconnect', () => {

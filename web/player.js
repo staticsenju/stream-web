@@ -205,6 +205,12 @@
 					}
 					video.play().catch(() => {});
 					saveContinueWatching(orig)
+					try {
+						if (watchAmHost && watchPartyCode) {
+							watchEmitState({ action: 'load', url: orig, title: seriesData?.title || URL_TITLE || '', seasonId: current.seasonId, episodeId: current.episodeId, slug: SLUG || '' })
+							watchLog('host emitted load after manifest parsed', orig, { seasonId: current.seasonId, episodeId: current.episodeId })
+						}
+					} catch (e) { watchLog('emit after manifest failed', e) }
 				});
 				hls.on(Hls.Events.LEVELS_UPDATED, () => {
 					if (!animeOptionsPopulated()) populateQualityFromLevels(hls.levels)
@@ -226,6 +232,12 @@
 				video.addEventListener('loadedmetadata', () => {
 					video.play().catch(() => {});
 					saveContinueWatching(orig)
+					try {
+						if (watchAmHost && watchPartyCode) {
+							watchEmitState({ action: 'load', url: orig, title: seriesData?.title || URL_TITLE || '', seasonId: current.seasonId, episodeId: current.episodeId, slug: SLUG || '' })
+							watchLog('host emitted load after loadedmetadata', orig, { seasonId: current.seasonId, episodeId: current.episodeId })
+						}
+					} catch (e) { watchLog('emit after loadedmetadata failed', e) }
 				}, {
 					once: true
 				})
@@ -1092,14 +1104,28 @@
 
 					hostBtn.addEventListener('click', () => {
 						if (!watchPartyCode) return setStatus('no code')
-						watchAmHost = !watchAmHost;
-						hostBtn.textContent = watchAmHost ? 'Hosting' : 'Host';
-						watchLog('host toggle', { code: watchPartyCode, host: watchAmHost })
-						watchSocket.emit('watch:host', watchPartyCode, watchAmHost, (res) => {
+						const wantHost = !watchAmHost
+						watchLog('request host toggle', { code: watchPartyCode, wantHost })
+						watchSocket.emit('watch:host', watchPartyCode, wantHost, (res) => {
 							watchLog('host cb', res)
+							if (res && res.ok) {
+								const hostNow = !!res.host
+								watchAmHost = hostNow
+								hostBtn.textContent = watchAmHost ? 'Hosting' : 'Host'
+								localStorage.setItem('watch_party', JSON.stringify({ code: watchPartyCode, host: watchAmHost }))
+								setStatus(watchAmHost ? 'Hosting' : 'Joined '+watchPartyCode)
+								if (watchAmHost) {
+									try {
+										const last = JSON.parse(localStorage.getItem('watch_last')||'null')
+										const file = (last && last.file) ? last.file : (params.get('file') || null)
+										watchEmitState({ action: 'load', url: file, title: seriesData?.title||URL_TITLE||'', seasonId: current.seasonId, episodeId: current.episodeId, slug: SLUG||'' })
+										try { watchEmitState({ action: video && !video.paused ? 'play' : 'pause', time: video ? video.currentTime : 0 }) } catch(e){}
+									} catch(e){ watchLog('emit current state on host claim failed', e) }
+								}
+							} else {
+								setStatus('host request failed')
+							}
 						})
-						localStorage.setItem('watch_party', JSON.stringify({ code: watchPartyCode, host: watchAmHost }))
-						setStatus(watchAmHost ? 'Hosting' : 'Joined '+watchPartyCode)
 					})
 
 					watchSocket.on('connect', () => watchLog('socket connect', watchSocket.id))
@@ -1115,6 +1141,16 @@
 						watchLog('received watch:state', state)
 						watchApplyRemoteState(state)
 					})
+
+						watchSocket.on('watch:host', (data) => {
+							try {
+								watchLog('received watch:host', data)
+								const hostId = data && data.hostId ? String(data.hostId) : null
+								watchAmHost = !!(watchSocket && hostId && watchSocket.id === hostId)
+								if (hostBtn) hostBtn.textContent = watchAmHost ? 'Hosting' : 'Host'
+								localStorage.setItem('watch_party', JSON.stringify({ code: watchPartyCode, host: watchAmHost }))
+							} catch (e) { watchLog('watch:host handler err', e) }
+						})
 
 					function emitState(state) {
 						if (!watchSocket || !watchPartyCode) return
