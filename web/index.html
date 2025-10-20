@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -117,5 +118,28 @@ footer{margin-top:36px;color:var(--muted);text-align:center}
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
 <script src="/app.js"></script>
+<div id="site-settings" aria-hidden="true">
+  <button id="settings-toggle" class="settings-btn" aria-label="Open settings" title="Settings">
+    ⚙️
+  </button>
+
+  <div id="settings-panel" class="settings-panel" role="dialog" aria-modal="false" aria-hidden="true" aria-label="Settings">
+    <header class="settings-header">
+      <strong>Settings</strong>
+      <button id="settings-close" class="settings-close" aria-label="Close settings">✕</button>
+    </header>
+
+    <div class="settings-body">
+      <label class="setting-row">
+        <span>School mode</span>
+        <input id="school-mode-toggle" type="checkbox" />
+      </label>
+      <p class="setting-desc">When enabled, the site attempts to open the launcher in a discreet about:blank wrapper to hide the original tab from history.</p>
+    </div>
+  </div>
+</div>
+
+<link rel="stylesheet" href="/settings.css" />
+<script src="/settings.js" defer></script>
   </body>
 </html>
