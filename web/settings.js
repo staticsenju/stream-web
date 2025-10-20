@@ -118,7 +118,7 @@
           }
           try {
             w.document.open();
-            w.document.write('<script>document.title = "about:blank";<\/script>' +
+            w.document.write('<script>document.title = "about:blank";<\\/script>' +
               '<iframe id="__ab_launcher_iframe" style="position: absolute; top: 0px; bottom: 0px; right: 0px; width: 100%; border: none; margin: 0; padding: 0; overflow: hidden; z-index: 99999; height: 100%;" src="' + target.replace(/"/g, '&quot;') + '"></iframe>');
             w.document.close();
             try { console.debug('[SchoolMode:injected] wrote iframe to popup for', target); } catch(e){}
@@ -210,6 +210,12 @@
       console.warn('Failed to inject school-mode wrapper script:', e);
     }
   }
+  try {
+    if (new URLSearchParams(window.location.search).has('school')) {
+      setOn(true);
+      injectSchoolWrapper();
+    }
+  } catch (e) {}
   window.SchoolMode = {
     isEnabled: isOn,
     enable: function(){ setOn(true); injectSchoolWrapper(); },
