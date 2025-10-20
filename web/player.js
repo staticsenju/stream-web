@@ -55,7 +55,7 @@
 			try { watchSocket.emit('watch:state', watchPartyCode, state) } catch (e) { watchLog('emit error', e) }
 		}
 
-		function watchApplyRemoteState(state, forceSeek=false) {
+		async function watchApplyRemoteState(state, forceSeek=false) {
 			if (!state) return
 			try {
 				watchApplyingRemote = true
@@ -83,6 +83,18 @@
 						if (forceSeek || diff > 0.5) video.currentTime = state.time
 					}
 				} else if (state.action === 'load') {
+					// Prefer to load by episode metadata if provided
+					try {
+						if (state.slug && state.seasonId && state.episodeId && typeof loadEpisode === 'function' && seriesData) {
+							watchLog('remote load: calling loadEpisode', { seasonId: state.seasonId, episodeId: state.episodeId })
+							// attempt to find matching season and episode ids from seriesData
+							const s = seriesData.seasons?.find(ss => String(ss.id) === String(state.seasonId))
+							if (s) {
+								await loadEpisode(s.id, state.episodeId)
+								return
+							}
+						}
+					} catch (e) { watchLog('remote load by metadata failed', e) }
 					if (state.url) publicPlay(state.url, state.title||'')
 				}
 			} catch (e) { watchLog('apply remote exception', e) }
@@ -776,7 +788,7 @@
 
 				try {
 					if (watchAmHost && watchPartyCode) {
-						watchEmitState({ action: 'load', url: finalSrc, title: seriesData?.title || URL_TITLE || '' })
+						watchEmitState({ action: 'load', url: finalSrc, title: seriesData?.title || URL_TITLE || '', seasonId, episodeId, slug: SLUG || '' })
 						watchLog('host emitted load for', finalSrc)
 					}
 				} catch (e) { watchLog('loadEpisode emit error', e) }
