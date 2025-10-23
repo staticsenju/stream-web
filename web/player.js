@@ -1188,6 +1188,7 @@
 					console.warn('saveContinueWatching failed', e)
 				}
 			}
+			
 			async function resumeEntry(entry) {
 				const u = entry.url;
 				if (!u) return;
