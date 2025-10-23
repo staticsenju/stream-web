@@ -60,6 +60,17 @@
       const real = document.getElementById('school-mode-toggle-real');
       if (real && real.checked && switchWrapper) switchWrapper.classList.add('on');
     }
+
+    const clearHistoryBtn = document.getElementById('clear-history-btn');
+    if (clearHistoryBtn) {
+      clearHistoryBtn.addEventListener('click', () => {
+        if (confirm('Are you sure you want to clear your entire watch history? This cannot be undone.')) {
+          localStorage.removeItem('streamweb_history');
+          alert('Watch history has been cleared.');
+          window.location.reload();
+        }
+      });
+    }
   }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initUI, { once: true });

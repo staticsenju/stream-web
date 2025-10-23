@@ -87,11 +87,9 @@
 						if (forceSeek || diff > 0.5) video.currentTime = state.time
 					}
 				} else if (state.action === 'load') {
-					// Prefer to load by episode metadata if provided
 					try {
 						if (state.slug && state.seasonId && state.episodeId && typeof loadEpisode === 'function' && seriesData) {
 							watchLog('remote load: calling loadEpisode', { seasonId: state.seasonId, episodeId: state.episodeId })
-							// attempt to find matching season and episode ids from seriesData
 							const s = seriesData.seasons?.find(ss => String(ss.id) === String(state.seasonId))
 							if (s) {
 								await loadEpisode(s.id, state.episodeId)
@@ -1131,39 +1129,56 @@
 			})
 			async function saveContinueWatching(orig) {
 				try {
-					if (!seriesData || !current || !current.epMeta) return;
+					const isMovie = (seriesData && Array.isArray(seriesData.seasons) && seriesData.seasons.length === 0);
+					if (!seriesData || (!isMovie && (!current || !current.epMeta))) return;
+
 					const title = seriesData.title || URL_TITLE || document.title;
 					let url = SLUG || orig || FILE_PARAM || '';
 					let seasonIndex = null;
 					let episodeIndex = null;
-					for (let i = 0; i < seriesData.seasons.length; i++) {
-						if (seriesData.seasons[i].id === current.seasonId) {
-							seasonIndex = i + 1;
-							const epIndex = (seriesData.seasons[i].episodes || []).findIndex(e => String(e.id) === String(current.epMeta.id) || String(e.data_id) === String(current.epMeta.data_id) || String(e.episodeNumber) === String(current.epMeta.episodeNumber));
-							if (epIndex >= 0) episodeIndex = epIndex + 1;
-							break
+					let seasonId = null;
+					let episodeId = null;
+					let episodeNumber = null;
+					let data_id = null;
+					let thumb = params.get('poster') || seriesData.poster || '';
+
+					if (!isMovie) {
+						for (let i = 0; i < seriesData.seasons.length; i++) {
+							if (seriesData.seasons[i].id === current.seasonId) {
+								seasonIndex = i + 1;
+								const epIndex = (seriesData.seasons[i].episodes || []).findIndex(e => String(e.id) === String(current.epMeta.id) || String(e.data_id) === String(current.epMeta.data_id) || String(e.episodeNumber) === String(current.epMeta.episodeNumber));
+								if (epIndex >= 0) episodeIndex = epIndex + 1;
+								break
+							}
 						}
+						if (SOURCE === 'anime') {
+							thumb = current.epMeta.snapshot || current.epMeta.thumb || current.epMeta.poster || thumb;
+						} else {
+							thumb = current.epMeta.thumb || current.epMeta.poster || thumb;
+						}
+						seasonId = current.seasonId;
+						episodeNumber = current.epMeta.episodeNumber || current.epMeta.id || '';
+						episodeId = current.epMeta.id || '';
+						data_id = current.epMeta.data_id || '';
 					}
-					let thumb = '';
-					if (SOURCE === 'anime') {
-						thumb = current.epMeta.snapshot || current.epMeta.thumb || current.epMeta.poster || params.get('poster') || ''
-					} else {
-						thumb = params.get('poster') || seriesData.poster || current.epMeta.thumb || current.epMeta.poster || ''
-					}
+					
 					const entry = {
 						title,
 						slug: SLUG || '',
 						url: url,
-						season: current.seasonId,
-						episode: current.epMeta.episodeNumber || current.epMeta.id || '',
+						season: seasonId,
+						episode: episodeNumber,
+						episodeId: episodeId,
 						seasonIndex,
 						episodeIndex,
-						data_id: current.epMeta.data_id || '',
-						thumb
+						data_id: data_id,
+						thumb,
+						source: SOURCE,
+						isMovie: isMovie
 					};
-					const key = `${entry.url}::${entry.season||''}::${entry.episode||''}`;
+					const key = isMovie ? entry.url : `${entry.url}::${entry.season||''}::${entry.episode||''}`;
 					const h = JSON.parse(localStorage.getItem('streamweb_history') || '[]');
-					const filtered = h.filter(a => `${a.url}::${a.season||''}::${a.episode||''}` !== key);
+					const filtered = h.filter(a => (a.isMovie ? a.url : `${a.url}::${a.season||''}::${a.episode||''}`) !== key);
 					filtered.unshift({
 						...entry,
 						ts: Date.now()
