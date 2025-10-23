@@ -19,11 +19,9 @@
       </div>
     </header>
 
-    <!-- video container -->
     <div class="video-wrap" id="video-wrap">
       <video id="video" class="video" playsinline webkit-playsinline preload="metadata"></video>
 
-      <!-- bottom controls -->
       <div class="controls" id="controls">
         <div class="controls-left">
           <button id="playpause" class="icon-btn" aria-label="Play/Pause">
@@ -48,6 +46,10 @@
         <div class="controls-right">
           <div class="time" id="time">00:00 / 00:00</div>
 
+          <select id="subtitle-select" class="select" title="Subtitles" aria-label="Subtitles">
+            <option value="-1">Subtitles: Off</option>
+          </select>
+
           <select id="audio-select" class="select" title="Audio" aria-label="Audio track">
             <option value="">Audio</option>
           </select>
@@ -63,7 +65,6 @@
     </div>
   </div>
 
-  <!-- Episode selector modal -->
   <div id="selector-modal" class="selector-modal hidden" role="dialog" aria-hidden="true">
     <div class="selector-card" role="document">
       <header class="selector-header">
@@ -74,9 +75,62 @@
     </div>
   </div>
 
-  <!-- hls.js CDN-->
+  <div id="shortcuts-modal" class="selector-modal hidden" role="dialog" aria-hidden="true">
+    <div class="shortcuts-card" role="document">
+      <header class="selector-header">
+        <h3>Keyboard Shortcuts</h3>
+        <button id="close-shortcuts" aria-label="Close">✕</button>
+      </header>
+      <div class="shortcuts-list">
+        <div class="shortcut-row">
+          <kbd>Space</kbd> or <kbd>K</kbd>
+          <span>Play/Pause</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>←</kbd> or <kbd>J</kbd>
+          <span>Rewind 10s</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>→</kbd> or <kbd>L</kbd>
+          <span>Forward 10s</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>↑</kbd>
+          <span>Volume up</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>↓</kbd>
+          <span>Volume down</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>M</kbd>
+          <span>Mute/Unmute</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>F</kbd>
+          <span>Fullscreen</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>C</kbd>
+          <span>Toggle subtitles</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>0-9</kbd>
+          <span>Jump to %</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>,</kbd> / <kbd>.</kbd>
+          <span>Frame back/forward</span>
+        </div>
+        <div class="shortcut-row">
+          <kbd>?</kbd>
+          <span>Show shortcuts</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1.4.0/dist/hls.min.js"></script>
-  <!-- socket.io client -->
   <script src="/socket.io/socket.io.js"></script>
   <script src="/player.js"></script>
 </body>

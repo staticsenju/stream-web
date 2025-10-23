@@ -165,6 +165,20 @@ app.get('/proxy/image', async (req, res) => {
   }
 })
 
+app.get('/proxy/subtitle', async (req, res) => {
+  const url = req.query.url
+  if (!url) return res.status(400).send('url required')
+  try {
+    const resp = await axiosGetWithInsecureFallback(url, { headers: { Referer: req.query.ref || '', 'User-Agent': 'stream-web' }, responseType: 'stream', timeout: 20000 })
+    res.setHeader('Access-Control-Allow-Origin', '*')
+    res.setHeader('Content-Type', 'text/vtt')
+    resp.data.pipe(res)
+  } catch (e) {
+    const msg = e && e.message ? e.message : 'unknown error'
+    res.status(500).send(msg)
+  }
+})
+
 async function axiosGetWithInsecureFallback(url, opts) {
   try {
     return await axios.get(url, opts)

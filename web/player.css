@@ -66,21 +66,88 @@ html,body{height:100%;margin:0;background:#000;font-family:Inter,system-ui,Arial
 .icon-btn{background:transparent;border:0;color:#fff;padding:10px;border-radius:8px;cursor:pointer;font-size:16px;display:inline-flex;align-items:center;justify-content:center;min-width:44px;height:44px}
 .icon{width:20px;height:20px;fill:currentColor}
 .icon.hidden{display:none}
-.select{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);padding:8px;border-radius:8px;font-size:14px}
+.select{
+  background:transparent;
+  border:1px solid rgba(255,255,255,0.06);
+  color:var(--muted);
+  padding:8px;
+  border-radius:8px;
+  font-size:14px;
+  cursor:pointer;
+  transition:border-color 150ms ease, background 150ms ease;
+}
+.select:hover{
+  border-color:rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.02);
+}
+.select:focus{
+  outline:none;
+  border-color:var(--accent);
+}
+.select option {
+  background: #1c1c1c;
+  color: #fff;
+}
+#subtitle-select{
+  min-width:140px;
+}
 .time{font-size:13px;color:var(--muted);min-width:120px;text-align:center}
 
 @media (max-width:720px) {
   .icon-btn{padding:12px;min-width:52px;height:52px;font-size:18px}
   .select{padding:10px;font-size:15px}
+  #subtitle-select{min-width:120px}
 }
 
 .progress-wrap{width:68vw;min-width:220px;max-width:820px}
-.progress-rail{height:6px;background:var(--rail);border-radius:6px;position:relative;overflow:hidden}
-.progress-buffer{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,0.08);width:0%}
-.progress-play{position:absolute;left:0;top:0;bottom:0;background:var(--play);width:0%}
-.seek{width:100%;margin-top:-6px;background:transparent;-webkit-appearance:none;appearance:none}
-.seek::-webkit-slider-thumb{ -webkit-appearance:none;height:12px;width:12px;border-radius:50%;background:var(--play);box-shadow:0 0 0 6px rgba(110,168,255,0.08)}
-.seek::-moz-range-thumb{height:12px;width:12px;border-radius:50%;background:var(--play);border:none}
+.progress-rail{
+  height:6px;
+  background:var(--rail);
+  border-radius:6px;
+  position:relative;
+  overflow:hidden;
+  cursor:pointer;
+  transition:height 150ms ease;
+}
+.progress-rail:hover{
+  height:8px;
+}
+.progress-buffer{position:absolute;left:0;top:0;bottom:0;background:rgba(255,255,255,0.08);width:0%;transition:width 150ms linear}
+.progress-play{position:absolute;left:0;top:0;bottom:0;background:var(--play);width:0%;transition:width 150ms linear}
+.seek{
+  width:100%;
+  margin-top:-6px;
+  background:transparent;
+  -webkit-appearance:none;
+  appearance:none;
+  cursor:pointer;
+}
+.seek::-webkit-slider-thumb{ 
+  -webkit-appearance:none;
+  height:12px;
+  width:12px;
+  border-radius:50%;
+  background:var(--play);
+  box-shadow:0 0 0 6px rgba(110,168,255,0.08);
+  cursor:pointer;
+  transition:transform 150ms ease, box-shadow 150ms ease;
+}
+.seek::-webkit-slider-thumb:hover{
+  transform:scale(1.2);
+  box-shadow:0 0 0 8px rgba(110,168,255,0.15);
+}
+.seek::-moz-range-thumb{
+  height:12px;
+  width:12px;
+  border-radius:50%;
+  background:var(--play);
+  border:none;
+  cursor:pointer;
+  transition:transform 150ms ease;
+}
+.seek::-moz-range-thumb:hover{
+  transform:scale(1.2);
+}
 
 @media (max-width:920px) {
   .progress-wrap{width:56vw;min-width:160px}
@@ -108,3 +175,46 @@ html,body{height:100%;margin:0;background:#000;font-family:Inter,system-ui,Arial
 .episode{padding:8px 10px;border-radius:8px;cursor:pointer;color:var(--muted)}
 .episode:hover{background:rgba(255,255,255,0.02);color:#fff}
 .episode.current{background:rgba(110,168,255,0.12);color:var(--accent)}
+
+.shortcuts-card{
+  width:420px;
+  max-height:80vh;
+  background:var(--glass);
+  backdrop-filter:blur(12px);
+  border-radius:10px;
+  padding:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.6);
+  overflow:auto;
+}
+.shortcuts-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  margin-top:12px;
+}
+.shortcut-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:8px 10px;
+  border-radius:6px;
+  background:rgba(255,255,255,0.02);
+}
+.shortcut-row kbd{
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:4px;
+  padding:4px 8px;
+  font-size:13px;
+  font-family:monospace;
+  color:#fff;
+  margin-right:4px;
+}
+.shortcut-row span{
+  color:var(--muted);
+  font-size:14px;
+}
+@media (max-width:480px) {
+  .shortcuts-card{width:90%;padding:12px}
+  .shortcut-row{flex-direction:column;align-items:flex-start;gap:6px}
+}

@@ -16,11 +16,15 @@
 		const selectorModal = document.getElementById('selector-modal')
 		const closeSelector = document.getElementById('close-selector')
 		const seasonsList = document.getElementById('seasons-list') || document.getElementById('sideEpisodes')
+		const shortcutsModal = document.getElementById('shortcuts-modal')
+		const closeShortcuts = document.getElementById('close-shortcuts')
+		const settingsBtn = document.getElementById('settings')
 		const seriesTitleEl = document.getElementById('selector-series-title') || document.getElementById('title') || document.getElementById('crumb')
 		const crumb = document.getElementById('crumb')
 		const episodeTitle = document.getElementById('episode-title')
 		const audioSelect = document.getElementById('audio-select') || document.getElementById('audio') || document.querySelector('[data-audio-select]')
 		const qualitySelect = document.getElementById('quality-select') || document.getElementById('res') || document.querySelector('[data-quality-select]')
+		const subtitleSelect = document.getElementById('subtitle-select')
 		let hls = null
 		let seriesData = null
 		let current = {
@@ -134,6 +138,120 @@
 			return h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`
 		}
 
+		function parseSubtitleLanguage(url) {
+			try {
+				const match = url.match(/\/([a-z]{3})-\d+\.vtt$/i);
+				if (!match) return null;
+				const code = match[1].toLowerCase();
+				
+				const langMap = {
+					'eng': 'English',
+					'spa': 'Spanish',
+					'fre': 'French',
+					'ger': 'German',
+					'ita': 'Italian',
+					'por': 'Portuguese',
+					'dut': 'Dutch',
+					'rus': 'Russian',
+					'jpn': 'Japanese',
+					'kor': 'Korean',
+					'chi': 'Chinese',
+					'ara': 'Arabic',
+					'hin': 'Hindi',
+					'tur': 'Turkish',
+					'pol': 'Polish',
+					'swe': 'Swedish',
+					'nor': 'Norwegian',
+					'dan': 'Danish',
+					'fin': 'Finnish',
+					'ice': 'Icelandic',
+					'gre': 'Greek',
+					'heb': 'Hebrew',
+					'tha': 'Thai',
+					'vie': 'Vietnamese',
+					'ind': 'Indonesian',
+					'may': 'Malay',
+					'fil': 'Filipino',
+					'cze': 'Czech',
+					'hun': 'Hungarian',
+					'rum': 'Romanian',
+					'ukr': 'Ukrainian'
+				};
+				
+				return langMap[code] || code.toUpperCase();
+			} catch (e) {
+				return null;
+			}
+		}
+
+		function addSubtitles(subsArray) {
+			if (!video) return;
+			
+			const existingTracks = video.querySelectorAll('track');
+			existingTracks.forEach(track => track.remove());
+			
+			if (subtitleSelect) {
+				subtitleSelect.innerHTML = '<option value="-1">Subtitles: Off</option>';
+			}
+			
+			if (!subsArray || !Array.isArray(subsArray) || subsArray.length === 0) {
+				return;
+			}
+			
+			const subsByLang = {};
+			subsArray.forEach(subUrl => {
+				const lang = parseSubtitleLanguage(subUrl);
+				if (lang) {
+					if (!subsByLang[lang]) {
+						subsByLang[lang] = [];
+					}
+					subsByLang[lang].push(subUrl);
+				}
+			});
+			
+			let trackIndex = 0;
+			Object.keys(subsByLang).forEach(lang => {
+				const urls = subsByLang[lang];
+				urls.forEach((url, index) => {
+					const track = document.createElement('track');
+					track.kind = 'subtitles';
+					const label = urls.length > 1 ? `${lang} ${index + 1}` : lang;
+					track.label = label;
+					track.srclang = lang.toLowerCase().substring(0, 2);
+					track.src = `/proxy/subtitle?url=${encodeURIComponent(url)}`;
+					track.mode = 'hidden';
+					
+					video.appendChild(track);
+					
+					if (subtitleSelect) {
+						const option = document.createElement('option');
+						option.value = String(trackIndex);
+						option.textContent = label;
+						subtitleSelect.appendChild(option);
+					}
+					
+					trackIndex++;
+				});
+			});
+			
+			if (subtitleSelect) {
+				subtitleSelect.onchange = () => {
+					const selectedIndex = parseInt(subtitleSelect.value);
+					const tracks = video.textTracks;
+					
+					for (let i = 0; i < tracks.length; i++) {
+						tracks[i].mode = 'hidden';
+					}
+					
+					if (selectedIndex >= 0 && selectedIndex < tracks.length) {
+						tracks[selectedIndex].mode = 'showing';
+					}
+				};
+			}
+			
+			console.log(`Added ${subsArray.length} subtitle tracks`);
+		}
+
 		function revokeGeneratedUrls() {
 			try {
 				generatedObjectUrls.forEach(u => {
@@ -158,6 +276,9 @@
 			}
 			if (video) {
 				try {
+					const existingTracks = video.querySelectorAll('track');
+					existingTracks.forEach(track => track.remove());
+					
 					video.removeAttribute('src');
 					video.load()
 				} catch (e) {}
@@ -431,11 +552,15 @@
 					if (!match) throw new Error();
 					const moviePage = new URL(match[1], FLIXHQ_BASE).toString();
 					let embedOrFile = null;
+					let subs = [];
 					try {
 						const dec = await fetch(decoderProxy(moviePage));
 						if (dec.ok) {
 							const jd = await dec.json();
-							embedOrFile = jd && (jd.file || jd.link || jd.url) ? (jd.file || jd.link || jd.url) : null
+							embedOrFile = jd && (jd.file || jd.link || jd.url) ? (jd.file || jd.link || jd.url) : null;
+							if (jd && jd.subs && Array.isArray(jd.subs)) {
+								subs = jd.subs
+							}
 						}
 					} catch (e) {}
 					if (!embedOrFile) {
@@ -461,12 +586,16 @@
 							const dec2 = await fetch(decoderProxy(embedOrFile));
 							if (dec2.ok) {
 								const jd2 = await dec2.json();
-								file = jd2 && (jd2.file || jd2.link || jd2.url) ? (jd2.file || jd2.link || jd2.url) : null
+								file = jd2 && (jd2.file || jd2.link || jd2.url) ? (jd2.file || jd2.link || jd2.url) : null;
+								if (jd2 && jd2.subs && Array.isArray(jd2.subs)) {
+									subs = jd2.subs
+								}
 							}
 						} catch (e) {}
 					}
 					const final = file ? (file.startsWith('/proxy/') ? file : `/proxy/manifest?url=${encodeURIComponent(file)}&ref=${encodeURIComponent(file)}`) : embedOrFile;
 					attachHls(final, file || embedOrFile);
+					addSubtitles(subs);
 					if (seriesTitleEl) seriesTitleEl.textContent = titleLabel || seriesTitleEl.textContent;
 					if (episodeTitle) episodeTitle.textContent = titleLabel || ''
 				} catch (e) {
@@ -481,16 +610,21 @@
 					const embed = await getFlixEmbedLink(serverId);
 					if (!embed) throw new Error('no embed');
 					let file = null;
+					let subs = [];
 					try {
 						const dec = await fetch(decoderProxy(embed));
 						if (dec.ok) {
 							const jd = await dec.json();
-							file = jd && (jd.file || jd.link || jd.url) ? (jd.file || jd.link || jd.url) : null
+							file = jd && (jd.file || jd.link || jd.url) ? (jd.file || jd.link || jd.url) : null;
+							if (jd && jd.subs && Array.isArray(jd.subs)) {
+								subs = jd.subs
+							}
 						}
 					} catch (e) {}
 					if (!file && /\.m3u8/i.test(embed)) file = embed;
 					const final = file ? (file.startsWith('/proxy/') ? file : `/proxy/manifest?url=${encodeURIComponent(file)}&ref=${encodeURIComponent(file)}`) : embed;
 					attachHls(final, file || embed);
+					addSubtitles(subs);
 					if (seriesTitleEl) seriesTitleEl.textContent = titleLabel || seriesTitleEl.textContent;
 					if (episodeTitle) episodeTitle.textContent = titleLabel || ''
 				} catch (e) {
@@ -834,26 +968,48 @@
 				selectorModal?.classList.add('hidden');
 				selectorModal?.setAttribute('aria-hidden', 'true')
 			}
+			
+			function showShortcuts() {
+				shortcutsModal?.classList.remove('hidden');
+				shortcutsModal?.setAttribute('aria-hidden', 'false')
+			}
+
+			function hideShortcuts() {
+				shortcutsModal?.classList.add('hidden');
+				shortcutsModal?.setAttribute('aria-hidden', 'true')
+			}
+			
 			openSelector?.addEventListener('click', showSelector)
 			closeSelector?.addEventListener('click', hideSelector)
 			selectorModal?.addEventListener('click', e => {
 				if (e.target === selectorModal) hideSelector()
 			})
+			
+			settingsBtn?.addEventListener('click', showShortcuts)
+			closeShortcuts?.addEventListener('click', hideShortcuts)
+			shortcutsModal?.addEventListener('click', e => {
+				if (e.target === shortcutsModal) hideShortcuts()
+			})
 			async function publicPlay(urlOrPage, displayTitle, opts = {}) {
 				let final = urlOrPage;
+				let subs = [];
 				if (!/\.m3u8/i.test(final) && !/\/proxy\/manifest\?/i.test(final)) {
 					try {
 						const dec = await fetch(decoderProxy(final));
 						if (dec.ok) {
 							const jd = await dec.json();
 							const candidate = jd && (jd.file || jd.link || jd.url) ? (jd.file || jd.link || jd.url) : null;
-							if (candidate) final = candidate
+							if (candidate) final = candidate;
+							if (jd && jd.subs && Array.isArray(jd.subs)) {
+								subs = jd.subs
+							}
 						}
 					} catch (e) {}
 				}
 				if (/\.m3u8/i.test(final)) {
 					final = final.startsWith('/proxy/') ? final : `/proxy/manifest?url=${encodeURIComponent(final)}&ref=${encodeURIComponent(final)}`;
 					attachHls(final, final);
+					addSubtitles(subs);
 					if (seriesTitleEl && displayTitle) seriesTitleEl.textContent = displayTitle;
 					if (episodeTitle && opts && opts.episodeTitle) episodeTitle.textContent = `${displayTitle} · ${opts.episodeTitle}`;
 					return
@@ -863,9 +1019,13 @@
 					if (dec.ok) {
 						const jd = await dec.json();
 						const candidate = jd && (jd.file || jd.link || jd.url) ? (jd.file || jd.link || jd.url) : null;
+						if (jd && jd.subs && Array.isArray(jd.subs)) {
+							subs = jd.subs
+						}
 						if (candidate && /\.m3u8/i.test(candidate)) {
 							const proxied = candidate.startsWith('/proxy/') ? candidate : `/proxy/manifest?url=${encodeURIComponent(candidate)}&ref=${encodeURIComponent(candidate)}`;
 							attachHls(proxied, candidate);
+							addSubtitles(subs);
 							return
 						}
 					}
@@ -873,7 +1033,8 @@
 				try {
 					video.src = urlOrPage;
 					video.load();
-					video.play().catch(() => {})
+					video.play().catch(() => {});
+					addSubtitles(subs)
 				} catch (e) {}
 			}
 			playBtn?.addEventListener('click', () => {
@@ -908,6 +1069,44 @@
 					}
 				} catch (e) {}
 			})
+			
+			const progressWrap = document.getElementById('progress-wrap');
+			const progressRail = progressWrap?.querySelector('.progress-rail');
+			
+			if (progressRail) {
+				const handleProgressClick = (e) => {
+					if (!video || !video.duration) return;
+					const rect = progressRail.getBoundingClientRect();
+					const x = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+					const pct = Math.max(0, Math.min(100, ((x - rect.left) / rect.width) * 100));
+					const time = (pct / 100) * video.duration;
+					video.currentTime = time;
+					if (progressPlay) progressPlay.style.width = `${pct}%`;
+					if (seek) seek.value = pct;
+				};
+				
+				progressRail.addEventListener('click', handleProgressClick);
+				
+				let touchSeeking = false;
+				progressRail.addEventListener('touchstart', (e) => {
+					touchSeeking = true;
+					seeking = true;
+					handleProgressClick(e);
+				}, { passive: false });
+				
+				progressRail.addEventListener('touchmove', (e) => {
+					if (touchSeeking) {
+						e.preventDefault();
+						handleProgressClick(e);
+					}
+				}, { passive: false });
+				
+				progressRail.addEventListener('touchend', () => {
+					touchSeeking = false;
+					seeking = false;
+				});
+			}
+			
 			seek?.addEventListener('input', e => {
 				seeking = true;
 				const val = Number(e.target.value);
@@ -1011,15 +1210,106 @@
 				window.location.href = `/player.html?source=flixhq&slug=${encodeURIComponent(entry.url)}&title=${encodeURIComponent(entry.title||'')}&poster=${encodeURIComponent(entry.thumb||'')}`
 			}
 			document.addEventListener('keydown', e => {
-				if ((e.key === ' ' || e.code === 'Space') && !(document.activeElement && /input|textarea/i.test(document.activeElement.tagName))) {
+				if (document.activeElement && /input|textarea|select/i.test(document.activeElement.tagName)) {
+					if (e.key === 'Escape') {
+						document.activeElement.blur();
+						if (document.fullscreenElement) document.exitFullscreen();
+					}
+					return;
+				}
+				
+				const key = e.key.toLowerCase();
+				
+				if (key === ' ' || key === 'k') {
 					e.preventDefault();
 					if (video) {
 						if (video.paused) video.play();
-						else video.pause()
+						else video.pause();
 					}
 				}
-				if (e.key === 'Escape') {
-					if (document.fullscreenElement) document.exitFullscreen()
+				
+				else if (key === 'arrowleft' || key === 'j') {
+					e.preventDefault();
+					if (video) video.currentTime = Math.max(0, video.currentTime - 10);
+				}
+				
+				else if (key === 'arrowright' || key === 'l') {
+					e.preventDefault();
+					if (video) video.currentTime = Math.min(video.duration || 0, video.currentTime + 10);
+				}
+				
+				else if (key === 'arrowup') {
+					e.preventDefault();
+					if (video) video.volume = Math.min(1, video.volume + 0.05);
+				}
+				
+				else if (key === 'arrowdown') {
+					e.preventDefault();
+					if (video) video.volume = Math.max(0, video.volume - 0.05);
+				}
+				
+				else if (key === 'm') {
+					e.preventDefault();
+					if (video) video.muted = !video.muted;
+				}
+				
+				else if (key === 'f') {
+					e.preventDefault();
+					if (!document.fullscreenElement) {
+						if (playerRoot && playerRoot.requestFullscreen) playerRoot.requestFullscreen();
+						else if (video && video.webkitEnterFullscreen) {
+							try { video.webkitEnterFullscreen(); } catch (e) {}
+						}
+					} else {
+						document.exitFullscreen();
+					}
+				}
+				
+				else if (key === 'escape') {
+					if (document.fullscreenElement) {
+						e.preventDefault();
+						document.exitFullscreen();
+					}
+				}
+				
+				else if (key === '?' || (e.shiftKey && key === '/')) {
+					e.preventDefault();
+					showShortcuts();
+				}
+				
+				else if (/^[0-9]$/.test(key)) {
+					e.preventDefault();
+					if (video && video.duration) {
+						const pct = parseInt(key) / 10;
+						video.currentTime = pct * video.duration;
+					}
+				}
+				
+				else if (key === 'c') {
+					e.preventDefault();
+					if (subtitleSelect) {
+						const currentIndex = parseInt(subtitleSelect.value);
+						const nextIndex = currentIndex + 1;
+						
+						if (nextIndex >= subtitleSelect.options.length) {
+							subtitleSelect.value = '-1';
+						} else {
+							subtitleSelect.value = String(nextIndex);
+						}
+						
+						const event = new Event('change');
+						subtitleSelect.dispatchEvent(event);
+					}
+				}
+				
+				else if (key === ',') {
+					e.preventDefault();
+					if (video) video.currentTime = Math.max(0, video.currentTime - 0.1);
+				}
+				
+				else if (key === '.') {
+					e.preventDefault();
+					if (video) video.currentTime = Math.min(video.duration || 0, video.currentTime + 0.1);
 				}
 			})
 			window.player = window.player || {};
