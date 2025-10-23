@@ -72,8 +72,6 @@ Examples:
 - Each entry includes: title, slug, url, season, episode, seasonIndex, episodeIndex, data_id, thumb, ts.
 - The player saves a history entry automatically when playback starts (it uses episode snapshot for anime; poster for TV/movies — ensure the `poster` query param is passed from the search page to player).
 
-If you want to make the saved thumbnail more reliable, ensure `app.js` passes `&poster=` when redirecting to `player.html` (this repository already uses `poster` query param in the app).
-
 ---
 
 ## Troubleshooting
