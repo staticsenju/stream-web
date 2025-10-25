@@ -3,6 +3,13 @@ const FLIXHQ_BASE = 'https://flixhq.to'
 const apiProxy = (path) => `/proxy/fetch?url=${encodeURIComponent(path)}`
 const decoderProxy = (url) => `/proxy/decoder?url=${encodeURIComponent(url)}`
 
+function decodeEntities(encodedString) {
+    if (typeof encodedString !== 'string') return encodedString;
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = encodedString;
+    return textarea.value;
+}
+
 const resultsGrid = document.getElementById('results')
 const actionSelect = document.getElementById('actionSelect') || { value: 'play' }
 const sourceSelect = document.getElementById('sourceSelect') || { value: 'anime' }
@@ -85,7 +92,7 @@ async function search(query) {
       const src = imgEl.getAttribute('data-src') || imgEl.getAttribute('src') || ''
       try { posterUrl = new URL(src, FLIXHQ_BASE).toString() } catch(e) { posterUrl = src }
     }
-    results.push({ title, url, poster: posterUrl })
+    results.push({ title: decodeEntities(title), url, poster: posterUrl })
   })
   return results
 }
@@ -95,7 +102,7 @@ async function animeSearch(q) {
   if (!resp.ok) throw new Error('anime search failed')
   const jd = await resp.json()
   if (!jd || !jd.data) return []
-  return jd.data.map(a => ({ title: a.title, slug: a.session || a.id || a.slug, poster: a.poster || a.image || a.snapshot || '' }))
+  return jd.data.map(a => ({ title: decodeEntities(a.title), slug: a.session || a.id || a.slug, poster: a.poster || a.image || a.snapshot || '' }))
 }
 
 async function animeGetEpisodes(slug) {
@@ -525,4 +532,4 @@ document.addEventListener('keydown', (e)=>{
   if (e.key === 'Escape') {
     if (watchSection && watchSection.classList.contains('theater')) exitTheater()
   }
-})
+});

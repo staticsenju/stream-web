@@ -1,4 +1,25 @@
 (function() {
+		function decodeEntities(encodedString) {
+			if (typeof encodedString !== 'string') return encodedString;
+			var textarea = document.createElement('textarea');
+			textarea.innerHTML = encodedString;
+			return textarea.value;
+		}
+		function isMobile() {
+			return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || (('ontouchstart' in window) && (navigator.maxTouchPoints > 0));
+		}
+
+		if (isMobile()) {
+			document.addEventListener('DOMContentLoaded', () => {
+				const controlsRight = document.querySelector('.controls-right');
+				const fullscreenBtn = document.querySelector('#fullscreen');
+				const settingsBtn = document.querySelector('#settings');
+				if (controlsRight && fullscreenBtn && settingsBtn) {
+					controlsRight.insertBefore(fullscreenBtn, settingsBtn);
+					settingsBtn.style.display = 'none';
+				}
+			});
+		}
 		const FLIXHQ_BASE = 'https://flixhq.to'
 		const apiProxy = (path) => `/proxy/fetch?url=${encodeURIComponent(path)}`
 		const decoderProxy = (url) => `/proxy/decoder?url=${encodeURIComponent(url)}`
@@ -594,8 +615,8 @@
 					const final = file ? (file.startsWith('/proxy/') ? file : `/proxy/manifest?url=${encodeURIComponent(file)}&ref=${encodeURIComponent(file)}`) : embedOrFile;
 					attachHls(final, file || embedOrFile);
 					addSubtitles(subs);
-					if (seriesTitleEl) seriesTitleEl.textContent = titleLabel || seriesTitleEl.textContent;
-					if (episodeTitle) episodeTitle.textContent = titleLabel || ''
+					if (seriesTitleEl) seriesTitleEl.textContent = decodeEntities(titleLabel) || seriesTitleEl.textContent;
+					if (episodeTitle) episodeTitle.textContent = decodeEntities(titleLabel) || ''
 				} catch (e) {
 					console.error(e);
 					alert('Movie playback failed')
@@ -623,8 +644,8 @@
 					const final = file ? (file.startsWith('/proxy/') ? file : `/proxy/manifest?url=${encodeURIComponent(file)}&ref=${encodeURIComponent(file)}`) : embed;
 					attachHls(final, file || embed);
 					addSubtitles(subs);
-					if (seriesTitleEl) seriesTitleEl.textContent = titleLabel || seriesTitleEl.textContent;
-					if (episodeTitle) episodeTitle.textContent = titleLabel || ''
+					if (seriesTitleEl) seriesTitleEl.textContent = decodeEntities(titleLabel) || seriesTitleEl.textContent;
+					if (episodeTitle) episodeTitle.textContent = decodeEntities(titleLabel) || ''
 				} catch (e) {
 					console.error(e);
 					alert('Could not play episode')
@@ -632,8 +653,8 @@
 			}
 
 			function renderSeasons() {
-				if (seriesTitleEl) seriesTitleEl.textContent = seriesData?.title || URL_TITLE || 'Series';
-				if (crumb) crumb.textContent = seriesData?.title || URL_TITLE || '';
+				if (seriesTitleEl) seriesTitleEl.textContent = decodeEntities(seriesData?.title) || URL_TITLE || 'Series';
+				if (crumb) crumb.textContent = decodeEntities(seriesData?.title) || URL_TITLE || '';
 				if (!seasonsList) return;
 				seasonsList.innerHTML = '';
 				(seriesData?.seasons || []).forEach((season) => {
@@ -641,7 +662,7 @@
 					sEl.className = 'season';
 					const title = document.createElement('div');
 					title.className = 'season-title';
-					title.innerHTML = `<strong>${season.name}</strong><span>▸</span>`;
+					title.innerHTML = `<strong>${decodeEntities(season.name)}</strong><span>▸</span>`;
 					sEl.appendChild(title);
 					const episodesEl = document.createElement('div');
 					episodesEl.className = 'episodes';
@@ -653,10 +674,10 @@
 							epEl.className = 'episode';
 							epEl.dataset.seasonId = season.id;
 							epEl.dataset.episodeId = ep.data_id || ep.id || ep.episode || (idx + 1);
-							epEl.textContent = ((idx + 1) + '. ' + (ep.title || `Episode ${idx+1}`));
+							epEl.textContent = ((idx + 1) + '. ' + (decodeEntities(ep.title) || `Episode ${idx+1}`));
 							epEl.addEventListener('click', async () => {
 								if (SOURCE === 'flixhq' && ep.data_id) {
-									await playFlixEpisodeByDataId(ep.data_id, `${seriesData.title} · ${ep.title}`);
+									await playFlixEpisodeByDataId(ep.data_id, `${decodeEntities(seriesData.title)} · ${decodeEntities(ep.title)}`);
 									hideSelector();
 									return
 								}
@@ -880,7 +901,7 @@
 					epMeta
 				};
 				markCurrent();
-				if (episodeTitle) episodeTitle.textContent = `${seriesData.title} · ${epMeta.title||('Ep '+(epMeta.episodeNumber||episodeId))}`;
+				if (episodeTitle) episodeTitle.textContent = `${decodeEntities(seriesData.title)} · ${decodeEntities(epMeta.title)||('Ep '+(epMeta.episodeNumber||episodeId))}`;
 				if (SOURCE === 'anime' && SLUG && !options.skipOptionsFetch) {
 					const epNum = epMeta.episodeNumber ? String(epMeta.episodeNumber) : String(epMeta.id || episodeId);
 					const optsList = await fetchAnimeOptions(SLUG, epNum);
@@ -1008,8 +1029,8 @@
 					final = final.startsWith('/proxy/') ? final : `/proxy/manifest?url=${encodeURIComponent(final)}&ref=${encodeURIComponent(final)}`;
 					attachHls(final, final);
 					addSubtitles(subs);
-					if (seriesTitleEl && displayTitle) seriesTitleEl.textContent = displayTitle;
-					if (episodeTitle && opts && opts.episodeTitle) episodeTitle.textContent = `${displayTitle} · ${opts.episodeTitle}`;
+					if (seriesTitleEl && displayTitle) seriesTitleEl.textContent = decodeEntities(displayTitle);
+					if (episodeTitle && opts && opts.episodeTitle) episodeTitle.textContent = `${decodeEntities(displayTitle)} · ${decodeEntities(opts.episodeTitle)}`;
 					return
 				}
 				try {
